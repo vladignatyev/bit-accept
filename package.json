@@ -1,0 +1,34 @@
+{
+  "name": "bit-accept",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "cli": "node ./cli/index.js",
+    "watch": "jest --coverage --watchAll",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "babel-plugin-transform-runtime": "^6.23.0",
+    "biginteger": "^1.0.3",
+    "bip39": "^2.4.0",
+    "bitcoinjs-lib": "^3.2.1",
+    "config": "^1.27.0",
+    "decimal.js": "^7.3.0",
+    "jest": "^21.2.1",
+    "knex": "^0.13.0",
+    "pg": "^7.3.0",
+    "pg-hstore": "^2.3.2",
+    "request": "^2.83.0",
+    "request-promise": "^4.2.2",
+    "request-promise-native": "^1.0.5"
+  },
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "mocha": "^4.0.1",
+    "nock": "^9.0.27",
+    "sqlite3": "^3.1.13"
+  }
+}
