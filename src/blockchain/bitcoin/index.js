@@ -1,12 +1,10 @@
-const EventEmitter = require('events')
 const Decimal = require('decimal.js')
 const request = require('request-promise')
-const _ = require('lodash')
 
 
 class APIManager {
   getLatestBlocks(datetime) {
-    let time = datetime === undefined ? Date.now() : datetime
+    let time = (datetime === undefined ? Date.now() : datetime) / 1000 | 0 * 1000
 
     return request.get('https://blockchain.info/blocks/' + time + '?format=json').then((body) => {
       var responseObj = JSON.parse(body)
@@ -31,7 +29,7 @@ class APIManager {
         time: new Date(responseObj.time * 1000),
         hash: responseObj.hash
       }
-    });
+    })
   }
 
   getDepositsFromBlock(blockHash) {
@@ -50,37 +48,10 @@ class APIManager {
           })
         }
       }
-      return (txOutputs);
-    });
+      return txOutputs
+    })
   }
 }
 
 
-module.exports.APIManager = APIManager;
-//
-// class BlocksWatcher {
-//   constructor(latestBlockTime) {
-//     this.latestBlockTime = latestBlockTime
-//     this.blocksQueue = []
-//     this.interval = undefined
-//
-//     this.requestsPerformed = 0
-//   }
-//
-//   run() {
-//     if (this.blocksQueue.length === 0) {
-//       let me = this
-//       this.warmTheQueue().then(()=>{me.run()})
-//       return
-//     }
-//
-//   }
-//
-//   warmTheQueue() {
-//
-//   }
-//
-//   stop() {
-//     clearInterval(this.interval)
-//   }
-// }
+module.exports.APIManager = APIManager

@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "cli": "node ./cli/index.js",
-    "watch": "jest --coverage --watchAll",
+    "watch": "jest --watchAll",
+    "coverage": "jest --coverage --watchAll",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -27,8 +28,10 @@
   },
   "devDependencies": {
     "chai": "^4.1.2",
+    "knex-cleaner": "^1.1.3",
     "mocha": "^4.0.1",
     "nock": "^9.0.27",
+    "sinon": "^4.1.1",
     "sqlite3": "^3.1.13"
   }
 }

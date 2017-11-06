@@ -6,24 +6,17 @@ let Decimal = require('decimal.js')
 
 let bitcoin = require('./index')
 
-
 // Prepare nocks
-
 nock('https://blockchain.info')
   .get(/rawblock\/(.+)$/)
   .reply(200, require('./requests/rawblock'))
-
-nock('https://blockchain.info')
   .get(/latestblock$/)
   .reply(200, require('./requests/latestblock'))
-
-nock('https://blockchain.info')
   .get(/blocks\/(.+)$/)
   .reply(200, require('./requests/blocks'))
 
 
 describe('Blockchain.Bitcoin', () => {
-
   describe('APIManager', () => {
     it('should exist', () => {
       let a = new bitcoin.APIManager()
@@ -73,6 +66,6 @@ describe('Blockchain.Bitcoin', () => {
 
         done()
       })
-    })
+    }, 50000)
   })
 })
