@@ -6,11 +6,81 @@ let utils = require('./utils')
 
 let DatabaseBroker = require('./db')
 
-beforeEach(() => {
-  return Promise.all([knex('blocks').delete(), knex('addresses').delete(), knex('transactions').delete()])
-})
+let cleanDb = () => {
+  let queries = [
+    knex('blocks').delete(),
+    knex('addresses').delete(),
+    knex('transactions').delete()
+  ]
+  return Promise.all(queries)
+}
+
+beforeEach(cleanDb)
+afterEach(cleanDb)
 
 describe('DatabaseBroker', () => {
+  describe('#getUnprocessedBlocks', () => {
+    it('should return unprocessed block', (done) => {
+      db = new DatabaseBroker()
+
+      db.addParsedBlock('bitcoin', {
+        'hash': '0000000000000000001911629ebefadd68584f955060287dcd18909b25d850ae',
+        'height': 493185,
+        'time': new Date(1509885585 * 1000),
+        'processedTime': new Date()
+      }).then(() => {
+        return db.addParsedBlock('bitcoin', {
+          'hash': '00000000000000fake1911629ebefadd68584f955060287dcd18909b25d850ae',
+          'height': 493185,
+          'time': new Date(1509885585 * 1000)
+        })
+      }).then(() => {
+        return db.getUnprocessedBlocks()
+      }).then((blocks) => {
+        blocks.should.be.an('array').that.have.lengthOf(1)
+        blocks[0].hash.should.equal('00000000000000fake1911629ebefadd68584f955060287dcd18909b25d850ae')
+      }).then(done)
+    })
+  })
+
+  describe('#confirmBlock', () => {
+    it('should make block as processed timestamping it', (done) => {
+      db = new DatabaseBroker()
+
+      db.addParsedBlock('bitcoin', {
+        'hash': '0000000000000000001911629ebefadd68584f955060287dcd18909b25d850ae',
+        'height': 493185,
+        'time': new Date(1509885585 * 1000),
+        'processedTime': null
+      }).then(() => {
+        return db.confirmBlock('bitcoin', '0000000000000000001911629ebefadd68584f955060287dcd18909b25d850ae')
+      }).then(() => {
+        return knex('blocks').where('hash', '0000000000000000001911629ebefadd68584f955060287dcd18909b25d850ae').then((objs) => {
+          objs.should.be.an('array').that.have.lengthOf(1)
+          objs[0].processedTime.should.be.not.null
+        })
+      }).then(done)
+    })
+
+    it('should not be possible to get confirmed block as unprocessed', (done) => {
+      db = new DatabaseBroker()
+
+      db.addParsedBlock('bitcoin', {
+        'hash': '0000000000000000001911629ebefadd68584f955060287dcd18909b25d850ae',
+        'height': 493185,
+        'time': new Date(1509885585 * 1000),
+        'processedTime': null
+      }).then(() => {
+        return db.confirmBlock('bitcoin', '0000000000000000001911629ebefadd68584f955060287dcd18909b25d850ae')
+      }).then(() => {
+        return db.getUnprocessedBlocks()
+      }).then((blocks) => {
+        blocks.should.be.an('array').that.have.lengthOf(0)
+        // blocks[0].hash.should.equal('00000000000000fake1911629ebefadd68584f955060287dcd18909b25d850ae')
+      }).then(done)
+    })
+  })
+
   describe('#addParsedBlock', () => {
     it('should add parsed block', (done) => {
       db = new DatabaseBroker()

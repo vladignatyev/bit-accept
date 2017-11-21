@@ -4,6 +4,7 @@ var knex        = require('knex')(knexFile[knexConfig]);
 
 // migrate our database only if not in production environment
 if (knexConfig != 'production') {
+  console.log('Migrated DB.');
   knex.migrate.latest([knexFile]);
 }
 

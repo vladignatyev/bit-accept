@@ -7,24 +7,11 @@ class DatabaseBroker {
     this.knex = kn || knexObj
   }
 
-  getConfirmedBalanceOfAccount(accountName) {
-    // this.knex('addresses')
-    //   .where({'account': accountName})
-    //   .then((addresses) => {
-    //     console.log(addresses);
-    //   })
-  }
-  getUnconfirmedBalanceOfAccount(accountName) {
-
-  }
-
-
   getAllTransactionsByAccount(accountName) {
     return this.getAddressesForAccount(accountName).then((addrObjects) => {
       let addrList = _.map(addrObjects, (o) => { return o.address })
       return this.knex('transactions').whereIn('address', addrList)
     })
-
   }
 
   getAddressesForAccount(accountName) {
@@ -47,12 +34,11 @@ class DatabaseBroker {
             return addrObjects[0].address
           else
             return this.knex('addresses').transacting(trx).forUpdate().where({'account': '', 'chain': chain}).orderBy('importTime').limit(1).returning('id').then((objs) => {
-                if (objs.length < 1) throw new Error('There are no free addresses available')
-                return this.knex('addresses').transacting(trx).where('id', objs[0].id).update('account', accountName).returning('address').then((addresses) => {
-                  return addresses[0]
-                })
+              if (objs.length < 1) throw new Error('There are no free addresses available')
+              return this.knex('addresses').transacting(trx).where('id', objs[0].id).update('account', accountName).returning('address').then((addresses) => {
+                return addresses[0]
               })
-
+            })
         }).then(trx.commit).catch(trx.rollback)
     })
   }
@@ -88,9 +74,8 @@ class DatabaseBroker {
           'address': transaction.address,
           'chain': chain
         }).then((transactions) => {
-          if (transactions.length === 0) { // create transaction
+          if (transactions.length === 0)// create transaction
             return trx.insert(transactionObj).into('transactions').then(()=>{return trx.commit()})
-          }
           return trx.commit()
         })
       })
@@ -106,10 +91,37 @@ class DatabaseBroker {
           if (result.rowCount === 1) return true
           else return Promise.reject(new Error("DB Error. Unable to add block."))
         })
-      } else {
+      } else
         return undefined
+    })
+  }
+
+  getUnprocessedBlocks(chain) {
+    return this.knex('blocks').select('*').where('processedTime', null).map((row) => {
+      return {
+        'chain': row.chain,
+        'hash': row.hash,
+        'height': row.height,
+        'time': row.time,
+        'processedTime': row.processedTime
       }
     })
+  }
+
+  getLatestProcessedBlock(chain, block) {
+    return this.knex('blocks').select('*').where('processedTime', '<>', null).orderBy('processedTime').limit(1).map((row) => {
+      return {
+        'chain': row.chain,
+        'hash': row.hash,
+        'height': row.height,
+        'time': row.time,
+        'processedTime': row.processedTime
+      }
+    })
+  }
+
+  confirmBlock(chain, hash) {
+    return this.knex('blocks').where('hash', hash).update({'processedTime': new Date()})
   }
 
   getBlock(chain, hash) {
@@ -122,10 +134,10 @@ class DatabaseBroker {
         'processedTime': row.processedTime
       }
     }).then((blocks) => {
-      if (blocks.length === 1) return blocks[0]
-      else {
+      if (blocks.length === 1)
+        return blocks[0]
+      else
         return undefined
-      }
     })
   }
 
