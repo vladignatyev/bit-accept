@@ -66,12 +66,12 @@ class DatabaseBroker {
 
     return this.knex.transaction((trx) => {
 
-      return this.knex('addresses').transacting(trx).forUpdate().where('address', transaction.address).then((result) => {
+      return this.knex('addresses').transacting(trx).forUpdate().where('address', transactionObj.address).then((result) => {
         if (result.length === 0) return trx.commit() // should not create transaction if address is unknown
 
         return this.knex('transactions').transacting(trx).forUpdate().select('*').where({
-          'txid': transaction.txid,
-          'address': transaction.address,
+          'txid': transactionObj.txid,
+          'address': transactionObj.address,
           'chain': chain
         }).then((transactions) => {
           if (transactions.length === 0)// create transaction
@@ -97,7 +97,19 @@ class DatabaseBroker {
   }
 
   getUnprocessedBlocks(chain) {
-    return this.knex('blocks').select('*').where('processedTime', null).map((row) => {
+    return this.knex('blocks').select('*').where('processedTime', null).orderBy('time', 'asc').map((row) => {
+      return {
+        'chain': row.chain,
+        'hash': row.hash,
+        'height': row.height,
+        'time': row.time,
+        'processedTime': row.processedTime
+      }
+    })
+  }
+
+  getLatestAddedBlock(chain, block) {
+    return this.knex('blocks').select('*').orderBy('time', 'desc').limit(1).map((row) => {
       return {
         'chain': row.chain,
         'hash': row.hash,

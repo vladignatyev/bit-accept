@@ -1,3 +1,4 @@
+const debug = require('debug')('bitaccept:Bitcoin')
 const Decimal = require('decimal.js')
 const request = require('request-promise')
 const blocktrail = require('blocktrail-sdk')
@@ -11,6 +12,8 @@ class APIManager {
   getLatestBlocks(sinceDateTime) {
     let client = this.client
 
+    debug(`Requesting new blocks since ${sinceDateTime}`)
+
     let makeRequest = (since, page, blocks) => {
       return new Promise(function(resolve, reject) {
         let _blocks = blocks
@@ -18,8 +21,9 @@ class APIManager {
 
         let cb = (err, response) => {
           if (err) {
-            console.log('error occured', err);
+            console.error('Error has occured: ', err);
             reject(err)
+            return
           }
 
           for (var i = 0; i < response.data.length; i++) {
@@ -34,9 +38,14 @@ class APIManager {
               _blocks.push(block)
             } else {
               resolve({'abort': true})
+              return
             }
           }
-          resolve({page: response.current_page, perPage: response.per_page, total: response.total})
+
+          setTimeout(() => {
+            resolve({page: response.current_page, perPage: response.per_page, total: response.total})
+          }, 500)
+
         }
 
         if (page) client.allBlocks({sort_dir: 'desc', 'page': page, 'limit': 100}, cb)
@@ -57,7 +66,7 @@ class APIManager {
           resolve(blocks)
         }
       }
-      setTimeout(()=>{makeRequest(sinceDateTime, undefined, blocks).then(iterateOrResolve).catch(reject)}, 1000)
+      return makeRequest(sinceDateTime, undefined, blocks).then(iterateOrResolve).catch(reject)
     });
   }
 
@@ -81,7 +90,7 @@ class APIManager {
               _outputs.push({
                 'txhash': tx.hash,
                 'address': output.address,
-                'value': Decimal(output.value).mul(Decimal(0.00000001))
+                'value': output.value // in satoshis
               })
             }
           }

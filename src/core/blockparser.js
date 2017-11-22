@@ -6,61 +6,21 @@ let _ = require('lodash')
 let Queue = require('promise-queue')
 
 
-const DELAY = 1000
+const DELAY = 1000  // 1000 ms before parsing next block
 
 let _delay = () => {
-  return new new Promise(function(resolve, reject) {
+  return new Promise(function(resolve, reject) {
     setTimeout(resolve, DELAY)
   });
 }
 
 class BlockParser {
-  constructor(db, manager, chain, startBlockTime) {
+  constructor(chain, db, manager) {
+    this.chain = chain
     this.db = db
     this.manager = manager
-    this.chain = chain
-    this.startBlockTime = startBlockTime
-    this.stopped = false
 
-    this.queue = new Queue(1, Infinity)
-  }
-
-  parseBlocks() {
-    debug(`Parsing blocks...`)
-    const _db = this.db
-
-    return Promise.all([
-      _db.getLatestProcessedBlock(),
-      _db.getUnprocessedBlocks()
-    ], 500).then((blocks) => {
-
-      let latestProcessedBlock = blocks[0]
-      let unprocessedBlocks = blocks[1]
-
-      if (latestProcessedBlock.length === 1) {
-        this.startBlockTime = latestProcessedBlock[0].time
-        debug(`[${this.chain}] latest block is "${latestProcessedBlock[0].hash}", height ${latestProcessedBlock[0].height}, time ${latestProcessedBlock[0].time}`)
-      } else debug(`No blocks processed yet.`)
-
-      return this.processBlocks().then(this.loadNewBlocks.bind(this))
-    })
-  }
-
-  loadNewBlocks() {
-    debug(`Loading new blocks`)
-
-    const _db = this.db
-    const _chain = this.chain
-
-    return this.manager.getLatestBlocks(this.startBlockTime).then((blocks) => {
-      debug(`[${this.chain}] loaded ${blocks.length} new blocks, block #1 is "${blocks[0].hash} with height ${blocks[0].height}"`)
-      return Promise.all(_.map(blocks, (block) => {
-        debug(`Saving loaded block ${block.hash} with height ${block.height}`)
-        return _db.addParsedBlock(_chain, block).catch((err) => {
-          debug(err)
-        })
-      }))
-    })
+    this.q = new Queue(1, Infinity)
   }
 
   processBlocks() {
@@ -69,7 +29,7 @@ class BlockParser {
 
     const _chain = this.chain
     const _db = this.db
-    const _q = this.queue
+    const _q = this.q
     const _manager = this.manager
 
 
@@ -78,19 +38,21 @@ class BlockParser {
       let blocks = result[1]
       debug(`${blocks.length} blocks to process for ${addresses.length} known address.`)
 
-      let addressesPlainList = _.map(addresses, 'address')
+      let addressesPlainList = _.map(addresses, 'address')  // todo: use Bloem Filter for fast search
 
       for (var i = 0; i < blocks.length; i++) {
         const block = blocks[i]
         _q.add(() => {
           return _manager.getDepositsFromBlock(block.hash).then((deposits) => {
+            debug(`Block ${block.hash} has ${deposits.length} transactions.`)
              let promises = []
              let transactions = []
              for (var o = 0; o < deposits.length; o++) {
                let deposit = deposits[o]
 
-               if (addressesPlainList.indexOf(deposit.address) < 0) continue
+               if (addressesPlainList.indexOf(deposit.address) < 0) continue  // todo: use Bloem Filter for fast search
 
+               debug(`Found transaction to known address ${deposit.address}, with txid ${deposit.txhash}`)
                let txObj = {
                  'address': deposit.address,
                  'txid': deposit.txhash,
@@ -100,7 +62,7 @@ class BlockParser {
                  'importTime': new Date()
                }
 
-               transactions.push(_db.createTransaction.bind(_db, _chain, txObj))
+               transactions.push(_db.createTransaction(_chain, txObj))
              }
              _q.add(_delay)
 
@@ -126,43 +88,67 @@ class BlockParser {
       });
     }).catch((err) => { debug(err)})
   }
+}
 
-  stop() {
-    this.stopped = true
+
+class BlockLoader {
+  constructor(chain, db, manager, startBlockTime) {
+    this.chain = chain
+    this.db = db
+    this.manager = manager
+    this.startBlockTime = startBlockTime
   }
 
-  run() {
-    debug(`Started blockparser process.`)
-    if (this.stopped) {
-      debug(`Blockparser stopped.`)
-      this.stopped = false
-      return
-    }
+  loadBlocks() {
+    const _db = this.db
+    const _chain = this.chain
 
-    let self = this
+    debug(`Obtaining latest saved block...`)
 
-    new Promise(function(resolve, reject) {
-      return self.parseBlocks().then(() => {
-        if (self.stopped) {
-          resolve()
-          return
-        }
-        return self.parseBlocks().then(() => {
-          setTimeout(() => {
-            self.run()
-          }, 1000)
-        }).then(resolve).catch(reject)
-      }).catch(reject)
-    }).catch((err) => console.log(err))
+    return _db.getLatestAddedBlock().then((blocks) => {
+      if (blocks.length === 1) {
+        let block = blocks[0]
+        debug(`Found latest saved block ${block.hash}`)
+        this.startBlockTime = block.time
+      } else {
+        debug(`No saved blocks found.`)
+      }
+      debug(`Loading new blocks since ${this.startBlockTime.toString()}`)
+    }).then(() => {
+      return this.manager.getLatestBlocks(this.startBlockTime)
+    }).then((blocks) => {
+      if (blocks.length === 0) {
+        debug(`No new blocks mined yet.`)
+        return
+      }
+
+      debug(`[${this.chain}] loaded ${blocks.length} new blocks, block #1 is "${blocks[0].hash} with height ${blocks[0].height}"`)
+      return Promise.all(_.map(blocks, (block) => {
+        debug(`Saving ${block.hash} from '${this.chain}', height ${block.height}`)
+        return _db.addParsedBlock(_chain, block).catch((err) => {
+          debug(err)
+        })
+      }))
+    })
   }
 }
 
 //todo:
 // Сделать две отдельных Task:
-// - загрузка блоков по времени с момента последнего обработанного блока
-// - парсинг одного не распарсенного блока из БД
+// + загрузка блоков по времени с момента последнего обработанного блока
+// - парсинг одного не распарсенного блока из БД:
+  // - сделать загрузку и парсинг именно однго блока
+  // -
+
+
 // - оформить в виде двух отдельных команд, чтобы можно было supervisord использовать для их запуска
 // - убедиться что транзакици небоходимые создаются и балансы обновляются
 // - обернуть в либу чтобы таскать в другой проект (создать проект на Express'е с Дашбордом ICO)
 
-module.exports = BlockParser
+module.exports = {
+  'BlockLoader': BlockLoader,
+  'BlockParser': BlockParser
+}
+
+
+// module.exports = BlockParser
