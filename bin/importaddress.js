@@ -18,8 +18,6 @@ fs.readFile(filename, 'utf8', (err, data) => {
 
   let lines = data.split('\n')
 
-
-
   let addresses = []
 
   for (var i = 0; i < lines.length; i++) {
