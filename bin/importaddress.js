@@ -32,12 +32,10 @@ fs.readFile(filename, 'utf8', (err, data) => {
   console.log(`Found ${addresses.length} addresses.`);
 
   let db = new DatabaseBroker()
-  //
+
   db.addAddresses('bitcoin', addresses).then((ids) => {
     console.log(ids);
     console.log('Well done.');
     process.exit(0)
   })
-  //
-  // throw new Error('Not implemented!');
 });
